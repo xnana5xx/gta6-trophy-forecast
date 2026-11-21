@@ -99,7 +99,6 @@ def forecast_trophy(series, target_hours, horizon_days):
     b_shrunk = clamp(b_shrunk, -0.35, 2.0)
 
     x_target = math.log1p(target_hours)
-    trend = a + b_shrunk * x_target + (b - b_shrunk) * xs[-1] * 0.0
     # Re-anchor the shrunk line at the last observed point so the forecast
     # starts from where the rate actually is, not from the fitted level.
     trend = ys[-1] + b_shrunk * (x_target - xs[-1])
@@ -111,8 +110,10 @@ def forecast_trophy(series, target_hours, horizon_days):
         sigma = math.sqrt((0.5 * math.sqrt(max(horizon_days, 0.0))) ** 2 + 0.9 ** 2)
     else:
         # Blend the trend with persistence; log-time already saturates, so
-        # the trend leads, but never fully leaves the last read behind.
-        median = 0.7 * trend + 0.3 * persist
+        # the trend leads on long horizons, but the shorter the horizon the
+        # more the last read should anchor the forecast.
+        w_trend = clamp(0.35 + 0.09 * horizon_days, 0.35, 0.75)
+        median = w_trend * trend + (1.0 - w_trend) * persist
         walk = 0.5 * math.sqrt(max(horizon_days, 0.0))
         sigma = math.sqrt(walk ** 2 + resid_std ** 2 + 0.25 ** 2)
     sigma = clamp(sigma, 0.35, 2.4)
